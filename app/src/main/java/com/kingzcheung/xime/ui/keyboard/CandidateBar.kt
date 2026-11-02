@@ -143,6 +143,14 @@ fun CandidateBar(
     // 统一 8dp 靠边；横屏挖孔/导航栏的物理避让由服务层内容容器的边衬区 padding 统一处理，
     // 不再叠加手机横屏专用的 50dp 缩进
     val horizontalPadding = 8.dp
+    // 候选起始偏移：竖屏默认右移约一个键宽（28dp，落在 24~32dp 区间），
+    // 避免左手大拇指按左下角 ?123 键时正好盖住第一个候选词；横屏键盘矮、拇指更靠中间，
+    // 偏移减半；浮动键盘位置由用户拖动决定，不偏移。
+    val candidateStartOffset = when {
+        isFloatingMode -> 0.dp
+        isLandscape -> 12.dp
+        else -> 28.dp
+    }
     val context = LocalContext.current
 
     // 圆形图标按钮底色（logo / 返回 / 收起）：深色下与按键同材质——按键就是半透明白叠在
@@ -459,7 +467,7 @@ fun CandidateBar(
             }
 
             LazyRow(
-                modifier = if (state is CandidateBarState.Idle) Modifier else Modifier.weight(1f),
+                modifier = if (state is CandidateBarState.Idle) Modifier else Modifier.weight(1f).padding(start = candidateStartOffset),
                 state = candidateListState,
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 // 图片候选芯片比文字候选高：居中对齐，避免同排文字候选被顶到上沿

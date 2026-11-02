@@ -30,6 +30,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -186,55 +187,84 @@ private fun ToolPanelMainInput(
 ) {
     val fieldBg = MaterialTheme.colorScheme.surfaceVariant
     val fieldText = MaterialTheme.colorScheme.onSurfaceVariant
-    AndroidView(
-        factory = { context ->
-            val d = context.resources.displayMetrics.density
-            android.widget.EditText(context).apply {
-                background = fieldBackground(context, fieldBg)
-                setTextColor(fieldText.toArgb())
-                setHintTextColor(fieldText.copy(alpha = 0.4f).toArgb())
-                hint = tr(R.string.s_shurushangxiawenhuozhiling)
-                textSize = 14f
-                isSingleLine = true
-                gravity = Gravity.CENTER_VERTICAL or Gravity.START
-                setPadding((16 * d).toInt(), 0, (16 * d).toInt(), 0)
-
-                setImeActionLabel(tr(R.string.s_shengcheng), EditorInfo.IME_ACTION_DONE)
-                imeOptions = EditorInfo.IME_FLAG_NO_ENTER_ACTION or
-                    EditorInfo.IME_ACTION_DONE
-
-                doAfterTextChanged {
-                    if (!ToolPanelEditTextHolder.applyingProgrammatically) {
-                        ToolPanelEditTextHolder.userEdited = true
-                    }
-                }
-                onFocusChangeListener = View.OnFocusChangeListener { v, hasFocus ->
-                    handlePanelFieldFocus(v as android.widget.EditText, hasFocus, onFocusChange)
-                }
-                setOnClickListener { if (!isFocused) requestFocus() }
-                ToolPanelEditTextHolder.main = this
-                if (isFocused) {
-                    post { requestFocus() }
-                }
-            }
-        },
-        update = { editText ->
-            // 回填防覆盖：用户编辑过（userEdited）后宿主不再写输入框；
-            // 未编辑时仅在目标内容与当前不同才写入（插件轮询回传相同 inputText 不重置光标）
-            if (!ToolPanelEditTextHolder.userEdited) {
-                val want = initialText.replace('\n', ' ')
-                if (editText.text.toString() != want) {
-                    ToolPanelEditTextHolder.applyingProgrammatically = true
-                    editText.setText(want)
-                    editText.setSelection(want.length)
-                    ToolPanelEditTextHolder.applyingProgrammatically = false
-                }
-            }
-        },
+    var hasText by remember { mutableStateOf(false) }
+    var editTextRef by remember { mutableStateOf<android.widget.EditText?>(null) }
+    Box(
         modifier = Modifier
             .fillMaxWidth()
             .height(TOOL_PANEL_INPUT_HEIGHT_DP.dp),
-    )
+    ) {
+        AndroidView(
+            factory = { context ->
+                val d = context.resources.displayMetrics.density
+                android.widget.EditText(context).apply {
+                    background = fieldBackground(context, fieldBg)
+                    setTextColor(fieldText.toArgb())
+                    setHintTextColor(fieldText.copy(alpha = 0.4f).toArgb())
+                    hint = tr(R.string.s_shurushangxiawenhuozhiling)
+                    textSize = 14f
+                    isSingleLine = true
+                    gravity = Gravity.CENTER_VERTICAL or Gravity.START
+                    // 右侧留出一键清空按钮的空间，输入文字不压在 × 下面
+                    setPadding((16 * d).toInt(), 0, (38 * d).toInt(), 0)
+
+                    setImeActionLabel(tr(R.string.s_shengcheng), EditorInfo.IME_ACTION_DONE)
+                    imeOptions = EditorInfo.IME_FLAG_NO_ENTER_ACTION or
+                        EditorInfo.IME_ACTION_DONE
+
+                    doAfterTextChanged {
+                        if (!ToolPanelEditTextHolder.applyingProgrammatically) {
+                            ToolPanelEditTextHolder.userEdited = true
+                        }
+                        hasText = !text.isNullOrEmpty()
+                    }
+                    onFocusChangeListener = View.OnFocusChangeListener { v, hasFocus ->
+                        handlePanelFieldFocus(v as android.widget.EditText, hasFocus, onFocusChange)
+                    }
+                    setOnClickListener { if (!isFocused) requestFocus() }
+                    ToolPanelEditTextHolder.main = this
+                    editTextRef = this
+                    if (isFocused) {
+                        post { requestFocus() }
+                    }
+                }
+            },
+            update = { editText ->
+                // 回填防覆盖：用户编辑过（userEdited）后宿主不再写输入框；
+                // 未编辑时仅在目标内容与当前不同才写入（插件轮询回传相同 inputText 不重置光标）
+                if (!ToolPanelEditTextHolder.userEdited) {
+                    val want = initialText.replace('\n', ' ')
+                    if (editText.text.toString() != want) {
+                        ToolPanelEditTextHolder.applyingProgrammatically = true
+                        editText.setText(want)
+                        editText.setSelection(want.length)
+                        ToolPanelEditTextHolder.applyingProgrammatically = false
+                    }
+                }
+                hasText = !editText.text.isNullOrEmpty()
+            },
+            modifier = Modifier.fillMaxSize(),
+        )
+        // 一键清空：仅在输入框有内容时显示；点击清空后 doAfterTextChanged 会把 userEdited 置位，
+        // 宿主不再回填剪贴板 prefill，generate 时读到空串（插件提示"请先输入待翻译内容"）。
+        if (hasText) {
+            Icon(
+                imageVector = Icons.Filled.Close,
+                contentDescription = "清空输入",
+                tint = fieldText.copy(alpha = 0.6f),
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(end = 10.dp)
+                    .size(18.dp)
+                    .clickable {
+                        editTextRef?.let { et ->
+                            et.setText("")
+                            et.setSelection(0)
+                        }
+                    },
+            )
+        }
+    }
 }
 
 @Composable
