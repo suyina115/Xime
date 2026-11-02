@@ -143,13 +143,12 @@ fun CandidateBar(
     // 统一 8dp 靠边；横屏挖孔/导航栏的物理避让由服务层内容容器的边衬区 padding 统一处理，
     // 不再叠加手机横屏专用的 50dp 缩进
     val horizontalPadding = 8.dp
-    // 候选起始偏移：竖屏默认右移约一个键宽（28dp，落在 24~32dp 区间），
-    // 避免左手大拇指按左下角 ?123 键时正好盖住第一个候选词；横屏键盘矮、拇指更靠中间，
-    // 偏移减半；浮动键盘位置由用户拖动决定，不偏移。
+    // 候选起始偏移：竖屏默认右移（初版 28dp 偏大，按反馈减半到 14dp），
+    // 避免左手大拇指按左下角 ?123 键时盖住第一个候选词；横屏减半；浮动键盘不偏移。
     val candidateStartOffset = when {
         isFloatingMode -> 0.dp
-        isLandscape -> 12.dp
-        else -> 28.dp
+        isLandscape -> 6.dp
+        else -> 14.dp
     }
     val context = LocalContext.current
 
