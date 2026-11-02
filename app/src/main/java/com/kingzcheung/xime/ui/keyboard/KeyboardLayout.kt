@@ -454,8 +454,11 @@ internal fun invokeKeyAction(
 /**
  * 可上屏键（字母/数字等）的手势动作分发。
  *
- * - 未配置动作、COMMIT、SEND_RIME → 走 [onKeyPress]（沿用输入法组合/候选语义；调用方传入
- *   已按 shift 处理过的 [fallbackValue]，避免绕过大小写）；
+ * - 显式 COMMIT → 走 [onCommitText] 真·直接上屏（绕过 Rime 标点转换，修复
+ *   拼音态 z 键上滑 `*` 被转成间隔号 `·`；与 [invokeKeyAction] 的 COMMIT 语义一致）；
+ * - 未配置动作、SEND_RIME → 走 [onKeyPress]（沿用输入法组合/候选语义，
+ *   调用方传入已按 shift 处理过的 [fallbackValue]，避免绕过大小写；简写上滑符号
+ *   借此在中文态得到全角标点）；
  * - NONE → 视为未绑定，不触发；
  * - 其余动作（复制/粘贴/光标移动/面板切换等）→ [invokeKeyAction]。
  */
@@ -467,7 +470,8 @@ internal fun dispatchKeyActionOrPress(
     onGestureAction: ((GestureAction, String) -> Unit)?,
 ) {
     when (action?.action) {
-        null, GestureAction.COMMIT, GestureAction.SEND_RIME -> fallbackValue?.let(onKeyPress)
+        GestureAction.COMMIT -> (onCommitText ?: onKeyPress).let { it(fallbackValue ?: return) }
+        null, GestureAction.SEND_RIME -> fallbackValue?.let(onKeyPress)
         GestureAction.NONE -> Unit
         else -> invokeKeyAction(action, onKeyPress, onCommitText, onGestureAction)
     }

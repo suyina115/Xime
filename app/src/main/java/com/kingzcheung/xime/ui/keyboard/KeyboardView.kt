@@ -25,7 +25,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.twotone.Assignment
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.twotone.Quickreply
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -1287,6 +1289,42 @@ fun KeyboardView(
 
             val configuration = LocalConfiguration.current
             val isLandscapeBottom = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+
+            // 竖屏（非横屏、非浮动）底部快捷栏：左剪贴板、右快捷发送，
+            // 高度仅容纳图标；用原软件候选栏工具栏同款图标，风格统一。
+            if (!isLandscapeBottom && !state.isFloatingMode) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(38.dp)
+                        .background(keyboardBgColor),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.TwoTone.Assignment,
+                        contentDescription = tr(R.string.s_jiantieban),
+                        tint = keyTextColor.copy(alpha = 0.75f),
+                        modifier = Modifier
+                            .clickable {
+                                onHapticFeedback?.invoke()
+                                viewModel.showOverlay(OverlayRoute.Clipboard(0))
+                            }
+                            .padding(horizontal = 14.dp)
+                    )
+                    Spacer(Modifier.weight(1f))
+                    Icon(
+                        imageVector = Icons.TwoTone.Quickreply,
+                        contentDescription = tr(R.string.s_kuaijiefasong),
+                        tint = keyTextColor.copy(alpha = 0.75f),
+                        modifier = Modifier
+                            .clickable {
+                                onHapticFeedback?.invoke()
+                                viewModel.showOverlay(OverlayRoute.Clipboard(1))
+                            }
+                            .padding(horizontal = 14.dp)
+                    )
+                }
+            }
         }
 
         if (state.isDeploying) {
