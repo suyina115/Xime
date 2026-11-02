@@ -75,18 +75,18 @@ class KeyboardPanelConfigTest {
         assertEquals(
             listOf(
                 listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "0"),
-                listOf("＠", "＃", "＄", "＆", "＿", "－", "＋", "（", "）", "／"),
-                listOf("open_symbols", "＊", "“", "”", "！", "？", ",", ".", "delete"),
+                listOf("@", "#", "$", "&", "_", "-", "+", "(", ")", "/"),
+                listOf("open_symbols", "*", "“", "”", "!", "?", ",", ".", "delete"),
                 listOf("back", "number", "space_key", "enter"),
             ),
             symbols.rows,
         )
-        // 符号默认中文形态（全角）；只有 , 与 . 保留半角 ASCII
+        // 符号输出英文半角 ASCII（便于邮箱/密码/代码）；弯引号 “” 仍保留为中文成对引号
         assertTrue(
-            "符号键应为全角中文形态",
-            symbols.rows[1].all { it.length == 1 && it[0].code > 0x7E },
+            "符号键应为半角 ASCII",
+            symbols.rows[1].all { it.length == 1 && it[0].code <= 0x7E },
         )
-        assertTrue(", 与 . 应保留半角", "," in symbols.rows[2] && "." in symbols.rows[2])
+        assertTrue(", 与 . 为半角", "," in symbols.rows[2] && "." in symbols.rows[2])
         assertQuotePair(symbols.rows.flatten(), "平板常用符号段")
         assertTrue(
             "不应再出现中文逗号/句号（改用半角 , 与 .）",
@@ -223,15 +223,15 @@ class KeyboardPanelConfigTest {
         assertEquals(
             listOf(
                 listOf("tab", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "delete"),
-                listOf("caps", "＠", "＃", "＄", "＿", "＆", "－", "＋", "（", "）", "enter"),
-                listOf("open_symbols", "＊", "“", "”", "：", "；", "！", "？", "／", ",", "."),
+                listOf("caps", "@", "#", "$", "_", "&", "-", "+", "(", ")", "enter"),
+                listOf("open_symbols", "*", "“", "”", ":", ";", "!", "?", "/", ",", "."),
                 listOf("back", "number", "space_key", "cursor_left", "cursor_right", "back_right"),
             ),
             symbols.rows,
         )
-        // 与手机同一套字形：符号中文形态，, 与 . 半角
-        assertTrue("符号键应为全角中文形态", symbols.rows[1].drop(1).dropLast(1).all { it[0].code > 0x7E })
-        assertTrue(", 与 . 应保留半角", "," in symbols.rows[2] && "." in symbols.rows[2])
+        // 与手机同一套字形：符号半角 ASCII，, 与 . 同为半角
+        assertTrue("符号键应为半角 ASCII", symbols.rows[1].drop(1).dropLast(1).all { it[0].code <= 0x7E })
+        assertTrue(", 与 . 为半角", "," in symbols.rows[2] && "." in symbols.rows[2])
         assertQuotePair(symbols.rows.flatten(), "平板常用符号段")
         val keys = KeysConfigHelper.parseKeyboardYamlSection(text, "common_symbols_tablet")!!
         // 与平板 26 键逐列同宽（见 keyboard_tablet 各行的 tab/caps/shift_left/shift_right/mode_change/space）
@@ -245,7 +245,7 @@ class KeyboardPanelConfigTest {
         assertEquals(1.2f, keys["back_right"]?.width)
         assertEquals(1.2f, keys["."]?.width)
         assertNull("标准键宽不应写 width（默认 1）", keys["number"])
-        assertNull("标准键宽不应写 width（默认 1）", keys["＠"])
+        assertNull("标准键宽不应写 width（默认 1）", keys["@"])
         assertNull("标准键宽不应写 width（默认 1）", keys["cursor_left"])
         // 平板也只有一段（没有 _en 变体）
         assertNull("平板符号面板不应再有 _en 段", KeysConfigHelper.parsePanelLayoutYamlText(text, "common_symbols_en_tablet"))
