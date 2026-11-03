@@ -926,7 +926,7 @@ internal fun FunctionKeyCell(id: String, env: QwertyRowEnv, modifier: Modifier) 
         "back_right" -> PanelBackCell(env, modifier, id = "back_right")
         "number" -> PanelTextCell("number", "123", "number", special = true, env, modifier)
         "open_symbols" -> PanelTextCell("open_symbols", stringResource(R.string.keyboard_symbol), "symbol", special = true, env, modifier)
-        "space_bar" -> PanelTextCell("space_bar", stringResource(R.string.keyboard_space), "space", special = true, env, modifier)
+        "space_bar" -> PanelSpaceCell(env, modifier)
         "space_key" -> PanelTextCell("space_key", stringResource(R.string.keyboard_space), "space", special = false, env, modifier)
         else -> FileLogger.w("XimeKeyboard", "功能键 id \"$id\" 没有对应组件，该键不会显示：请改用受支持的 id")
     }

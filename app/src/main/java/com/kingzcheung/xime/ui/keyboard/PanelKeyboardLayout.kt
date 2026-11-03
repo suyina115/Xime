@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.SpaceBar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -379,6 +380,30 @@ private fun PanelEnterCell(env: QwertyRowEnv, modifier: Modifier = Modifier) {
         iconColor = env.specialKeyTextColor,
         modifier = modifier,
         a11yDescription = tr(R.string.s_huiche),
+        onPress = { env.onKeyPressDown?.invoke(value) },
+        shadowEnabled = env.shadowEnabled,
+        shadowElevation = env.shadowElevation,
+        shadowShapeRadius = env.shadowShapeRadius,
+    )
+}
+
+/**
+ * 数字键盘空格键：键面不再显示「空格」文字，改为空格图标（与回车图标同属 Material 图标体系）；
+ * 底色改用数字键底色，图标色沿用功能键文字色，点击仍发送空格。
+ */
+@Composable
+internal fun PanelSpaceCell(env: QwertyRowEnv, modifier: Modifier = Modifier) {
+    val tap = KeysConfigHelper.getGestureFor(env.section, "space_bar", env.isAsciiMode)?.tap
+    val value = tap?.value?.takeIf { it.isNotEmpty() } ?: "space"
+    IconKeyButton(
+        icon = rememberVectorPainter(Icons.Filled.SpaceBar),
+        onClick = {
+            dispatchKeyActionOrPress(tap, value, env.onKeyPress, env.onCommitText, env.onGestureAction)
+        },
+        backgroundColor = env.keyBackgroundColor,
+        iconColor = env.specialKeyTextColor,
+        modifier = modifier,
+        a11yDescription = tr(R.string.keyboard_space),
         onPress = { env.onKeyPressDown?.invoke(value) },
         shadowEnabled = env.shadowEnabled,
         shadowElevation = env.shadowElevation,
