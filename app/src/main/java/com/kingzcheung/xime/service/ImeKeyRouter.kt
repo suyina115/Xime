@@ -590,10 +590,6 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                         if (char.isNotEmpty() && char.any { it.code > 0x7E }) {
                             committedText = char
                             needsUIUpdate = true
-                        } else if (char == "(" || char == ")") {
-                            // 用户要求半角括号直接上屏，绕过 Rime 标点转换（避免中文态被转全角）
-                            committedText = char
-                            needsUIUpdate = true
                         } else if (isShifted && !isLetter) {
                             if (char.length == 1) {
                                 val charCode = char[0].code

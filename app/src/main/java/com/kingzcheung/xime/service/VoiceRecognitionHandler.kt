@@ -340,7 +340,7 @@ class VoiceRecognitionHandler(
             reconcileWithInputBox(ic)
             val visibleText = visibleEngineText(cleanText)
             if (visibleText.isNotEmpty()) {
-                commitFinal(ic, visibleText, lastWrittenText)
+                commitFinal(ic, addPunctuation(visibleText), lastWrittenText)
             } else {
                 Log.d(TAG, "handleSpeechResult: 内容已被外部消费，跳过提交")
             }

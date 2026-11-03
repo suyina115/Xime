@@ -1014,14 +1014,14 @@ keyboard:
     type: columns
     layout:
       left:
-        - ["+", "-", "*", "/", "="]
+        - ["+", "-", "*", "/"]
         - back
       rows:
         - [1, 2, 3]
         - [4, 5, 6]
         - [7, 8, 9]
         - [open_symbols, 0, "."]
-      right: [delete, space_bar, enter]
+      right: [delete, space_bar, emoji, enter]
     keys:
       enter: { tap: { action: send_rime, value: enter, label: "确定" } }
 

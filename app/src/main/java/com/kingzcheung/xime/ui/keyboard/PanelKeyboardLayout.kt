@@ -6,8 +6,6 @@ import com.kingzcheung.xime.i18n.tr
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,7 +15,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -372,32 +369,30 @@ private fun ColumnsPanelContent(layout: PanelLayoutConfig, env: QwertyRowEnv, mo
         ) {
             val pillarItems = layout.left.dropLast(1)
             val bottomKey = layout.left.lastOrNull()?.singleOrNull()
-            val scrollState = rememberScrollState()
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(3f)
-                    .padding(LocalKeyVisualPadding.current)
-                    .verticalScroll(scrollState),
+                    .padding(LocalKeyVisualPadding.current),
             ) {
                 pillarItems.forEachIndexed { itemIdx, item ->
-                    item.forEachIndexed { keyIdx, keyId ->
-                        OperatorPillarKey(
-                            text = keyId,
-                            onClick = { env.onKeyPress(keyId) },
-                            backgroundColor = env.keyBackgroundColor,
-                            textColor = env.keyTextColor,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(48.dp),
-                            onPress = { env.onKeyPressDown?.invoke(keyId) },
-                            isFirst = itemIdx == 0 && keyIdx == 0,
-                            isLast = itemIdx == pillarItems.lastIndex && keyIdx == item.lastIndex,
-                            fontSize = 18.sp,
-                            shadowEnabled = env.shadowEnabled,
-                            shadowElevation = env.shadowElevation,
-                            shadowShapeRadius = env.shadowShapeRadius,
-                        )
+                    Column(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                        item.forEachIndexed { keyIdx, keyId ->
+                            OperatorPillarKey(
+                                text = keyId,
+                                onClick = { env.onKeyPress(keyId) },
+                                backgroundColor = env.keyBackgroundColor,
+                                textColor = env.keyTextColor,
+                                modifier = Modifier.weight(1f),
+                                onPress = { env.onKeyPressDown?.invoke(keyId) },
+                                isFirst = itemIdx == 0 && keyIdx == 0,
+                                isLast = itemIdx == pillarItems.lastIndex && keyIdx == item.lastIndex,
+                                fontSize = 18.sp,
+                                shadowEnabled = env.shadowEnabled,
+                                shadowElevation = env.shadowElevation,
+                                shadowShapeRadius = env.shadowShapeRadius,
+                            )
+                        }
                     }
                 }
             }
@@ -415,11 +410,7 @@ private fun ColumnsPanelContent(layout: PanelLayoutConfig, env: QwertyRowEnv, mo
         Column(modifier = Modifier.weight(0.8f).fillMaxHeight()) {
             layout.right.forEach { item ->
                 val id = item.firstOrNull()
-                if (id != null) {
-                    // enter 键拉高占两行（原 emoji+enter 高度）
-                    val w = if (id == "enter") 2f else 1f
-                    PanelKeyCell(id, env, Modifier.weight(w))
-                }
+                if (id != null) PanelKeyCell(id, env, Modifier.weight(1f))
             }
         }
     }
