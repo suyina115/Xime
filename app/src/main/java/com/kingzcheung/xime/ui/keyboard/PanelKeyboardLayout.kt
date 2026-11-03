@@ -25,6 +25,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardReturn
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
@@ -361,6 +362,30 @@ private fun PanelKeyCell(id: String, env: QwertyRowEnv, modifier: Modifier = Mod
     )
 }
 
+/**
+ * 数字键盘确定键：键面显示回车图标（键面配色/阴影沿用原功能键），
+ * 点击仍按 keys.<section>.enter 配置发送回车。
+ */
+@Composable
+private fun PanelEnterCell(env: QwertyRowEnv, modifier: Modifier = Modifier) {
+    val tap = KeysConfigHelper.getGestureFor(env.section, "enter", env.isAsciiMode)?.tap
+    val value = tap?.value?.takeIf { it.isNotEmpty() } ?: "enter"
+    IconKeyButton(
+        icon = rememberVectorPainter(Icons.AutoMirrored.Filled.KeyboardReturn),
+        onClick = {
+            dispatchKeyActionOrPress(tap, value, env.onKeyPress, env.onCommitText, env.onGestureAction)
+        },
+        backgroundColor = env.specialKeyBackgroundColor,
+        iconColor = env.specialKeyTextColor,
+        modifier = modifier,
+        a11yDescription = tr(R.string.s_huiche),
+        onPress = { env.onKeyPressDown?.invoke(value) },
+        shadowEnabled = env.shadowEnabled,
+        shadowElevation = env.shadowElevation,
+        shadowShapeRadius = env.shadowShapeRadius,
+    )
+}
+
 /** rows 模式横屏分体：与主键盘分体同构（左右两半 0.42 + 中间 0.16，行内容拆半）。 */
 @Composable
 private fun RowsPanelSplitContent(rows: List<List<String>>, env: QwertyRowEnv, modifier: Modifier = Modifier) {
@@ -457,9 +482,10 @@ private fun ColumnsPanelContent(
             layout.right.forEach { item ->
                 val id = item.firstOrNull()
                 if (id != null) {
-                    // enter 拉高占两格（原表情键 + 确定键的高度），仍与原四行高度对齐
+                    // enter 显示回车图标并拉高占两格（原表情键 + 确定键的高度），仍与原四行高度对齐
                     val weight = if (id == "enter") 2f else 1f
-                    PanelKeyCell(id, env, Modifier.weight(weight))
+                    if (id == "enter") PanelEnterCell(env, Modifier.weight(weight))
+                    else PanelKeyCell(id, env, Modifier.weight(weight))
                 }
             }
         }

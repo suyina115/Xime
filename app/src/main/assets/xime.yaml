@@ -1020,10 +1020,10 @@ keyboard:
         - [1, 2, 3]
         - [4, 5, 6]
         - [7, 8, 9]
-        - [space_bar, 0, "."]
+        - [0, space_bar, "."]
       right: [delete, open_symbols, enter]
     keys:
-      enter: { tap: { action: send_rime, value: enter, label: "确定" } }
+      enter: { tap: { action: send_rime, value: enter, label: "回车" } }
 
   # ── 常用符号键盘（rows 行布局；中英共用一套，不再分中/英两段、没有 En 键）──
   # 符号输出英文半角 ASCII 形态（@#$&_-+()/、*!? 等），便于输入邮箱/密码/代码/英文句子；
