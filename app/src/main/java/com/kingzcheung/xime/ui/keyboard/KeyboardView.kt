@@ -895,13 +895,10 @@ fun KeyboardView(
 
                         val context = LocalContext.current
 
+                        // 主键盘「123」键固定直进九宫格数字盘（不再经过数字符号混合盘）：
+                        // 混合盘对本用户无用途，数字盘内的 open_symbols 仍可进入全量符号面板。
                         var modeChangeTarget: KeyboardLayoutAction by remember {
-                            mutableStateOf(
-                                if (SettingsPreferences.getModeChangeTargetIsNumber(context))
-                                    KeyboardLayoutAction.SwitchToNumber
-                                else
-                                    KeyboardLayoutAction.SwitchToCommonSymbol
-                            )
+                            mutableStateOf(KeyboardLayoutAction.SwitchToNumber)
                         }
 
                         val fullScreenOnKeyPress: (String) -> Unit = { key ->

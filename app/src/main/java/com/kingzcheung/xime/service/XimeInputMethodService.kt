@@ -2321,6 +2321,12 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         // 必须携带当前 schemaId，否则 T9/笔画等专用布局会被错误重置为默认全键盘。
         // restarting=true 表示同一输入会话内的状态刷新（应用 restartInput），此时不应
         // 重置布局，否则数字/符号面板会在输入中被切回全键盘。
+        // 纯数字输入框（号码/验证码等）自动进入数字面板，可由设置关闭。
+        // 提到 RimeEngine.isInitialized() 门之外：冷启动时引擎尚未就绪也能直接进数字面板，
+        // 否则号码框会先弹 26 键、等引擎就绪后才切走，表现为"不响应数字框"。
+        val forceNumberPanel = !restarting &&
+            EditorInfoClassifier.isNumberEditor(attribute) &&
+            SettingsPreferences.isAutoNumberKeyboardEnabled(this)
         if (RimeEngine.isInitialized() && !restarting) {
             // ascii 确定性决策：默认中文（英文态不跨收起存活），密码框临时英文。
             // 不读引擎当前值——上次会话收起时的落点不再决定本次初始状态
@@ -2331,14 +2337,15 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             // 用持久化方案兜底，避免布局退化为 26 键全键盘
             val schemaId = uiState.value.currentSchemaId
                 .ifBlank { SettingsPreferences.getCurrentSchema(this) }
-            // 纯数字输入框（号码/验证码等）自动进入数字面板，可由设置关闭
-            val forceNumberPanel = EditorInfoClassifier.isNumberEditor(attribute) &&
-                SettingsPreferences.isAutoNumberKeyboardEnabled(this)
             debugLog(
                 "onStartInput: editor inputType=0x${Integer.toHexString(attribute?.inputType ?: 0)}, " +
                     "restricted=$editorRestricted, forceNumberPanel=$forceNumberPanel"
             )
             keyboardViewModel.resetKeyboard(startAscii, schemaId, forceNumberPanel)
+        } else if (forceNumberPanel) {
+            // 引擎未就绪：九宫格数字面板不依赖拼音引擎，直接进入，避免号码框弹 26 键。
+            FileLogger.i(TAG, "onStartInput: number editor, entering number panel (rime not ready)")
+            keyboardViewModel.resetKeyboard(false, "", true)
         } else {
             val rimeAscii = if (RimeEngine.isInitialized()) rimeEngine.isAsciiMode() else "n/a"
             FileLogger.i(TAG, "onStartInput: skip keyboard reset, restarting=$restarting, rimeAscii=$rimeAscii, ui=${uiState.value.isAsciiMode}")

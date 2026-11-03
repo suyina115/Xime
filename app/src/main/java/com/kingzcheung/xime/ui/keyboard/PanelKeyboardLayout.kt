@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.kingzcheung.xime.keyboard.GestureAction
 import com.kingzcheung.xime.settings.KeysConfigHelper
 import com.kingzcheung.xime.settings.PanelLayoutConfig
 import com.kingzcheung.xime.ui.isTablet
@@ -287,7 +288,17 @@ private fun PanelKeyCell(id: String, env: QwertyRowEnv, modifier: Modifier = Mod
     val commit = tap?.value?.takeIf { it.isNotEmpty() } ?: id
     KeyButton(
         text = commit,
-        onClick = { dispatchKeyActionOrPress(tap, commit, env.onKeyPress, env.onCommitText, env.onGestureAction) },
+        onClick = {
+            // 面板值键（数字/符号）直接上屏半角 ASCII，绕过 Rime 标点转换：
+            // 邮箱/密码/代码场景的 ( ) @ # 等始终半角，不因中文态被转成全角。
+            // 仅当显式配置了非上屏动作（命令/复制等）时才走手势分发。
+            when (tap?.action) {
+                null, GestureAction.SEND_RIME ->
+                    env.onCommitText?.invoke(commit) ?: env.onKeyPress(commit)
+                else ->
+                    dispatchKeyActionOrPress(tap, commit, env.onKeyPress, env.onCommitText, env.onGestureAction)
+            }
+        },
         backgroundColor = env.keyBackgroundColor,
         textColor = env.keyTextColor,
         modifier = modifier,
