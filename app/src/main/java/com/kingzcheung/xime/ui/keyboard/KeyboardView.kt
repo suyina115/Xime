@@ -1536,8 +1536,15 @@ fun KeyboardView(
                     is OverlayRoute.Edit -> {
                         val editAction: (String) -> Unit = { action ->
                             when (action) {
-                                "delete" -> callbacks.onKeyPress("delete", false)
-                                "enter" -> callbacks.onKeyPress("enter", false)
+                                // onKeyPress 不带反馈，补 onKeyPressDown 触发删除/回车音效与振动
+                                "delete" -> {
+                                    callbacks.onKeyPressDown?.invoke("delete")
+                                    callbacks.onKeyPress("delete", false)
+                                }
+                                "enter" -> {
+                                    callbacks.onKeyPressDown?.invoke("enter")
+                                    callbacks.onKeyPress("enter", false)
+                                }
                                 else -> callbacks.onToolbarEditingAction?.invoke(action)
                             }
                         }
@@ -1548,6 +1555,7 @@ fun KeyboardView(
                             textColor = keyTextColor,
                             accentColor = accentColor,
                             keyBgColor = keyBgColor,
+                            specialKeyBgColor = specialKeyBgColor,
                             bottomPaddingDp = state.keyboardBottomPaddingDp,
                             keyCornerRadius = overlayKeyCornerRadius(kbKey, isTablet()),
                             shadowEnabled = kbShadow.enabled,

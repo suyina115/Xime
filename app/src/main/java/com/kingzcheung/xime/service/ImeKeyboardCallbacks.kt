@@ -172,7 +172,11 @@ internal fun rememberImeKeyboardCallbacks(
                 @Suppress("DEPRECATION")
                 imm.showInputMethodPicker()
             },
-            onToolbarEditingAction = { action -> service.schemaController.handleToolbarEditingAction(action) },
+            onToolbarEditingAction = { action ->
+                // 编辑面板按键与主键盘一致的按键音/振动（delete/enter 走 onKeyPress 已有反馈）
+                service.feedbackManager.performKeyPressDownEffect(action, view)
+                service.schemaController.handleToolbarEditingAction(action)
+            },
             onCommitImage = { imagePath ->
                 val success = service.textCommit.commitImage(imagePath)
                 if (!success) {

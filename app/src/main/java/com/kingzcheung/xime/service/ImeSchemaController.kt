@@ -8,6 +8,7 @@ import android.content.Intent
 import android.os.SystemClock
 import android.util.Log
 import android.view.KeyEvent
+import android.view.inputmethod.ExtractedTextRequest
 import android.view.inputmethod.InputConnection
 import android.widget.Toast
 import com.kingzcheung.xime.MainActivity
@@ -116,7 +117,11 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
         }
     }
     
+    // 编辑面板选择态：anchor 为锚点（按"选择"时的光标位），active 为选区活动端。
+    // 自维护 active，不依赖编辑器回报的选区位置——小米笔记等 app 在有选区时
+    // getTextBeforeCursor 基于选区起点，重复按键会推算卡死/回跳。
     private var editSelAnchor = -1
+    private var editSelActive = -1
 
     internal fun handleToolbarEditingAction(action: String) {
         val ic = service.currentInputConnection ?: return
@@ -125,11 +130,25 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
             "copy" -> ic.performContextMenuAction(android.R.id.copy)
             "cut" -> ic.performContextMenuAction(android.R.id.cut)
             "paste" -> ic.performContextMenuAction(android.R.id.paste)
-            "home" -> ic.setSelection(0, 0)
+            "home" -> {
+                if (editSelAnchor >= 0) {
+                    // 选择态：选中锚点到段首
+                    editSelActive = 0
+                    applyEditSelection(ic)
+                } else {
+                    ic.setSelection(0, 0)
+                }
+            }
             "end" -> {
-                val before = ic.getTextBeforeCursor(XimeInputMethodService.SAFE_TEXT_LIMIT, 0) ?: ""
-                val after = ic.getTextAfterCursor(XimeInputMethodService.SAFE_TEXT_LIMIT, 0) ?: ""
-                ic.setSelection(before.length + after.length, before.length + after.length)
+                if (editSelAnchor >= 0) {
+                    // 选择态：选中锚点到段尾
+                    editSelActive = editFullText(ic).length
+                    applyEditSelection(ic)
+                } else {
+                    val before = ic.getTextBeforeCursor(XimeInputMethodService.SAFE_TEXT_LIMIT, 0) ?: ""
+                    val after = ic.getTextAfterCursor(XimeInputMethodService.SAFE_TEXT_LIMIT, 0) ?: ""
+                    ic.setSelection(before.length + after.length, before.length + after.length)
+                }
             }
             "arrow_up" -> {
                 val t = SystemClock.uptimeMillis()
@@ -153,50 +172,75 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
             }
 
             "select_begin" -> {
-                editSelAnchor = (ic.getTextBeforeCursor(XimeInputMethodService.SAFE_TEXT_LIMIT, 0) ?: "").length
+                // 优先用 ExtractedText 的真实光标位（长文本下不受 SAFE_TEXT_LIMIT 截断影响）
+                val et = ic.getExtractedText(ExtractedTextRequest(), 0)
+                editSelAnchor = et?.selectionEnd
+                    ?: (ic.getTextBeforeCursor(XimeInputMethodService.SAFE_TEXT_LIMIT, 0) ?: "").length
+                editSelActive = editSelAnchor
             }
             "select_end" -> {
                 editSelAnchor = -1
+                editSelActive = -1
             }
-            "select_arrow_left" -> extendSelection(ic, -1)
-            "select_arrow_right" -> extendSelection(ic, 1)
-            "select_arrow_up" -> {
-                val before = ic.getTextBeforeCursor(XimeInputMethodService.SAFE_TEXT_LIMIT, 0) ?: ""
-                val pos = before.length
-                if (pos > 0) {
-                    val prevNewline = before.lastIndexOf('\n', pos - 2)
-                    val lineStart = if (prevNewline >= 0) prevNewline + 1 else 0
-                    ic.beginBatchEdit()
-                    ic.setSelection(editSelAnchor, lineStart)
-                    ic.endBatchEdit()
-                }
-            }
-            "select_arrow_down" -> {
-                val before = ic.getTextBeforeCursor(XimeInputMethodService.SAFE_TEXT_LIMIT, 0) ?: ""
-                val after = ic.getTextAfterCursor(XimeInputMethodService.SAFE_TEXT_LIMIT, 0) ?: ""
-                val pos = before.length
-                val total = before.length + after.length
-                if (pos < total) {
-                    val nextNewline = after.indexOf('\n')
-                    val lineEnd = if (nextNewline >= 0) pos + nextNewline else total
-                    ic.beginBatchEdit()
-                    ic.setSelection(editSelAnchor, lineEnd)
-                    ic.endBatchEdit()
-                }
-            }
+            "select_arrow_left" -> moveEditSelectionByChar(ic, -1)
+            "select_arrow_right" -> moveEditSelectionByChar(ic, 1)
+            "select_arrow_up" -> moveEditSelectionByLine(ic, -1)
+            "select_arrow_down" -> moveEditSelectionByLine(ic, 1)
         }
     }
 
-    private fun extendSelection(ic: InputConnection, direction: Int) {
+    /** 编辑面板全文：优先 ExtractedText，失败时回退光标前后拼接（与位置推算基准一致）。 */
+    private fun editFullText(ic: InputConnection): CharSequence {
+        val et = ic.getExtractedText(ExtractedTextRequest(), 0)
+        et?.text?.let { return it }
         val before = ic.getTextBeforeCursor(XimeInputMethodService.SAFE_TEXT_LIMIT, 0) ?: ""
         val after = ic.getTextAfterCursor(XimeInputMethodService.SAFE_TEXT_LIMIT, 0) ?: ""
-        val pos = before.length
-        val total = before.length + after.length
-        val next = (pos + direction).coerceIn(0, total)
-        if (next != pos) {
-            ic.beginBatchEdit()
-            ic.setSelection(editSelAnchor, next)
-            ic.endBatchEdit()
+        return before.toString() + after
+    }
+
+    private fun applyEditSelection(ic: InputConnection) {
+        // 文本可能在选择态期间被外部改短，锚点/活动端越界会导致 setSelection 异常
+        val len = editFullText(ic).length
+        ic.beginBatchEdit()
+        ic.setSelection(editSelAnchor.coerceIn(0, len), editSelActive.coerceIn(0, len))
+        ic.endBatchEdit()
+    }
+
+    private fun moveEditSelectionByChar(ic: InputConnection, direction: Int) {
+        if (editSelAnchor < 0) return
+        val len = editFullText(ic).length
+        val next = (editSelActive + direction).coerceIn(0, len)
+        if (next != editSelActive) {
+            editSelActive = next
+            applyEditSelection(ic)
+        }
+    }
+
+    private fun moveEditSelectionByLine(ic: InputConnection, direction: Int) {
+        if (editSelAnchor < 0) return
+        val text = editFullText(ic)
+        val len = text.length
+        val pos = editSelActive.coerceIn(0, len)
+        val target = if (direction > 0) {
+            // 当前行行尾（即 \n 所在处）；已在行尾则跨到下一行行尾
+            var t = text.indexOf('\n', pos)
+            if (t < 0) t = len
+            if (t == pos && pos < len) {
+                t = text.indexOf('\n', pos + 1)
+                if (t < 0) t = len
+            }
+            t
+        } else {
+            // 当前行行首；已在行首则退到上一行行首
+            var lineStart = text.lastIndexOf('\n', pos - 1) + 1
+            if (lineStart == pos && pos > 0) {
+                lineStart = text.lastIndexOf('\n', pos - 2) + 1
+            }
+            lineStart
+        }
+        if (target != pos) {
+            editSelActive = target
+            applyEditSelection(ic)
         }
     }
 

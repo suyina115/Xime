@@ -48,6 +48,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
@@ -66,6 +67,10 @@ private val quadrants = listOf(
     Quadrant("←", 135f, "arrow_left"),
 )
 
+/** 方向盘长按连发节奏：按住 400ms 起，每 50ms 重复一次（与系统键重复手感一致） */
+private const val DPAD_REPEAT_DELAY_MS = 400L
+private const val DPAD_REPEAT_INTERVAL_MS = 50L
+
 @Composable
 fun EditKeyboardLayout(
     onAction: (String) -> Unit,
@@ -74,6 +79,8 @@ fun EditKeyboardLayout(
     textColor: Color,
     accentColor: Color,
     keyBgColor: Color,
+    /** 功能键底色（回车/删除键同款）：选择态时方向盘内圈环变色提示，随主题 */
+    specialKeyBgColor: Color = keyBgColor,
     bottomPaddingDp: Int = 0,
     /** 与主键盘一致的主题按键圆角（LocalKeyCornerRadius），供复用的 KeyButton 读取 */
     keyCornerRadius: Dp = 8.dp,
@@ -174,6 +181,7 @@ fun EditKeyboardLayout(
                     textColor = textColor,
                     accentColor = accentColor,
                     backgroundColor = backgroundColor,
+                    specialKeyBgColor = specialKeyBgColor,
                     shadowEnabled = shadowEnabled,
                     shadowElevation = shadowElevation,
                     modifier = circleModifier
@@ -213,6 +221,7 @@ private fun CircularDPad(
     textColor: Color,
     accentColor: Color,
     backgroundColor: Color,
+    specialKeyBgColor: Color,
     shadowEnabled: Boolean = true,
     shadowElevation: Dp = 1.dp,
     modifier: Modifier = Modifier
@@ -243,53 +252,54 @@ private fun CircularDPad(
             .clip(CircleShape)
             .background(keyBg)
             .pointerInput(isSelecting) {
+                // 命中区域判定：内圆=center，外环=方向键，之外=null
+                fun resolveAction(offset: Offset): String? {
+                    val w = size.width.toFloat()
+                    val h = size.height.toFloat()
+                    val cx = w / 2f
+                    val cy = h / 2f
+                    val dist = sqrt((offset.x - cx) * (offset.x - cx) + (offset.y - cy) * (offset.y - cy))
+                    val outerR = w / 2f * outerFraction
+                    val innerR = w / 2f * innerFraction
+                    return when {
+                        dist < innerR -> "center"
+                        dist < outerR -> {
+                            val angle = atan2(offset.y - cy, offset.x - cx)
+                            val deg = ((Math.toDegrees(angle.toDouble()) + 360) % 360).toFloat()
+                            when {
+                                deg in 225f..314f -> quadrants[0].actionBase
+                                deg in 315f..359f || deg in 0f..44f -> quadrants[1].actionBase
+                                deg in 45f..134f -> quadrants[2].actionBase
+                                else -> quadrants[3].actionBase
+                            }
+                        }
+                        else -> null
+                    }
+                }
                 detectTapGestures(
                     onPress = { offset ->
-                        val w = size.width.toFloat()
-                        val h = size.height.toFloat()
-                        val cx = w / 2f
-                        val cy = h / 2f
-                        val dist = sqrt((offset.x - cx) * (offset.x - cx) + (offset.y - cy) * (offset.y - cy))
-                        val outerR = w / 2f * outerFraction
-                        val innerR = w / 2f * innerFraction
-                        when {
-                            dist < innerR -> pressedAction = "center"
-                            dist < outerR -> {
-                                val angle = atan2(offset.y - cy, offset.x - cx)
-                                val deg = ((Math.toDegrees(angle.toDouble()) + 360) % 360).toFloat()
-                                pressedAction = when {
-                                    deg in 225f..314f -> quadrants[0].actionBase
-                                    deg in 315f..359f || deg in 0f..44f -> quadrants[1].actionBase
-                                    deg in 45f..134f -> quadrants[2].actionBase
-                                    else -> quadrants[3].actionBase
+                        val action = resolveAction(offset)
+                        pressedAction = action
+                        if (action != null && action != "center") {
+                            // 方向键：按住超时时进入连发（普通态=光标快速移动，选择态=快速扩展选区）
+                            val released = withTimeoutOrNull(DPAD_REPEAT_DELAY_MS) { tryAwaitRelease() }
+                            if (released == null) {
+                                while (true) {
+                                    onDirection(action)
+                                    val r = withTimeoutOrNull(DPAD_REPEAT_INTERVAL_MS) { tryAwaitRelease() }
+                                    if (r != null) break
                                 }
                             }
-                            else -> pressedAction = null
+                        } else {
+                            tryAwaitRelease()
                         }
-                        tryAwaitRelease()
                         pressedAction = null
                     },
                     onTap = { offset ->
-                        val w = size.width.toFloat()
-                        val h = size.height.toFloat()
-                        val cx = w / 2f
-                        val cy = h / 2f
-                        val dist = sqrt((offset.x - cx) * (offset.x - cx) + (offset.y - cy) * (offset.y - cy))
-                        val outerR = w / 2f * outerFraction
-                        val innerR = w / 2f * innerFraction
-                        when {
-                            dist < innerR -> onToggleSelect()
-                            dist < outerR -> {
-                                val angle = atan2(offset.y - cy, offset.x - cx)
-                                val deg = ((Math.toDegrees(angle.toDouble()) + 360) % 360).toFloat()
-                                val dirAction = when {
-                                    deg in 225f..314f -> quadrants[0].actionBase
-                                    deg in 315f..359f || deg in 0f..44f -> quadrants[1].actionBase
-                                    deg in 45f..134f -> quadrants[2].actionBase
-                                    else -> quadrants[3].actionBase
-                                }
-                                onDirection(dirAction)
-                            }
+                        when (val action = resolveAction(offset)) {
+                            "center" -> onToggleSelect()
+                            null -> {}
+                            else -> onDirection(action)
                         }
                     }
                 )
@@ -329,7 +339,8 @@ private fun CircularDPad(
                 )
             }
 
-            drawCircle(color = backgroundColor, radius = innerR)
+            // 选择态：中心键与方向键之间的环从键盘底色变为功能键底色（换行键同色），退出复原
+            drawCircle(color = if (isSelecting) specialKeyBgColor else backgroundColor, radius = innerR)
 
             val centerR = innerR * 0.82f
             if (isSelecting) {
