@@ -332,7 +332,7 @@ class VoiceRecognitionHandlerFinishTest {
         assertTrue(posted.isEmpty())
 
         runTimeouts()
-        verify(mockInputConnection, times(1)).commitText(any(), anyInt())
+        verify(mockInputConnection, never()).commitText(any(), anyInt())
     }
 
     @Test
