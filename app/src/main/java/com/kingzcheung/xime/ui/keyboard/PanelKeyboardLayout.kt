@@ -252,7 +252,9 @@ fun PanelKeyboardLayout(
                     onBack = { showSymbolPicker = false },
                     backgroundColor = keyboardBackgroundColor,
                     textColor = keyTextColor,
-                    accentColor = specialKeyTextColor,
+                    // 选中分类 tab 的底色：用功能键底色（浅底），文字 keyTextColor（深字）才有对比；
+                    // 误传 specialKeyTextColor（深字色）会让选中 tab 变深色块、文字不可见
+                    accentColor = specialKeyBackgroundColor,
                     keyBgColor = keyBackgroundColor,
                     specialKeyBgColor = specialKeyBackgroundColor,
                     specialKeyTextColor = specialKeyTextColor,
