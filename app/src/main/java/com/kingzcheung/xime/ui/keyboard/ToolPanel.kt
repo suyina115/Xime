@@ -222,7 +222,16 @@ private fun ToolPanelMainInput(
                     onFocusChangeListener = View.OnFocusChangeListener { v, hasFocus ->
                         handlePanelFieldFocus(v as android.widget.EditText, hasFocus, onFocusChange)
                     }
-                    setOnClickListener { if (!isFocused) requestFocus() }
+                    // 触摸按下即上报聚焦：点击宿主正文后，面板 EditText 的视图焦点未必真正丢失
+                    // （只是 IME 窗口失焦），再点面板不会触发焦点回调，按键路由会卡在宿主
+                    // （表现为"强制聚焦在正文输入栏"）——绕开焦点事件，保证"点哪输哪"可反复切换。
+                    setOnTouchListener { v, event ->
+                        if (event.action == android.view.MotionEvent.ACTION_DOWN) {
+                            v.requestFocus()
+                            handlePanelFieldFocus(v as android.widget.EditText, true, onFocusChange)
+                        }
+                        false
+                    }
                     ToolPanelEditTextHolder.main = this
                     editTextRef = this
                     // EditText 重建（符号/表情 Overlay 切换）时恢复快照文本，翻译内容不被清空

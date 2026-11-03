@@ -409,8 +409,14 @@ fun KeyboardView(
 
             // ACTIVE 输入面板在候选栏上方（需要 EditText 输入，保留候选栏可见）；
             // PASSIVE 纯展示面板走 Overlay 全屏（KeyboardView 底部 Overlay 分支渲染 InfoPanel）；
-            // Overlay 期间 ACTIVE 面板由 Emoji/Symbol 分支渲染（保持翻译框可见），此处不重复渲染（避免 holder 引用竞争）
-            if (state.toolPanelVisible && state.toolPanelDisplay != "PASSIVE" && page !is KeyboardPage.Overlay) {
+            // Emoji/Symbol Overlay 只替换按键区（底部 Overlay 分支顶部让位），翻译等 ACTIVE 面板
+            // 在 Emoji/Symbol 打开期间保持原位渲染——翻译框不随符号/表情切换而移位、EditText 不重建。
+            val toolPanelKeptOnOverlay = (page as? KeyboardPage.Overlay)?.route.let {
+                it is OverlayRoute.Emoji || it is OverlayRoute.Symbol
+            }
+            if (state.toolPanelVisible && state.toolPanelDisplay != "PASSIVE" &&
+                (page !is KeyboardPage.Overlay || toolPanelKeptOnOverlay)
+            ) {
                 ToolPanel(
                     title = state.toolPanelTitle,
                     isFocused = state.toolPanelInputFocused,
@@ -1428,10 +1434,24 @@ fun KeyboardView(
         }
 
         if (page is KeyboardPage.Overlay) {
+            // 翻译等 ACTIVE 面板开着时，Emoji/Symbol 覆盖层顶部让出"面板 + 工具栏"高度：
+            // 只覆盖键盘按键区，翻译框与工具栏保持原位可见可点；其余 Overlay 路由维持整屏覆盖。
+            val overlayTopOffset = run {
+                val r = (page as? KeyboardPage.Overlay)?.route
+                if (state.toolPanelVisible && state.toolPanelDisplay != "PASSIVE" &&
+                    (r is OverlayRoute.Emoji || r is OverlayRoute.Symbol)
+                ) {
+                    toolPanelHeightDp(hasControls = !state.toolPanelUiNodes.isNullOrEmpty()).dp +
+                        IconButtonRowHeight
+                } else {
+                    0.dp
+                }
+            }
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .fillMaxHeight()
+                    .padding(top = overlayTopOffset)
                     .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null
@@ -1570,88 +1590,46 @@ fun KeyboardView(
                             modifier = Modifier.fillMaxWidth().fillMaxHeight()
                         )
                     }
-                    is OverlayRoute.Emoji -> Column(Modifier.fillMaxWidth().fillMaxHeight()) {
-                        // 翻译等 ACTIVE 面板保持显示在表情面板上方（输入仍路由进面板，用户看得见输入去向）
-                        if (state.toolPanelVisible && state.toolPanelDisplay != "PASSIVE") {
-                            ToolPanel(
-                                title = state.toolPanelTitle,
-                                isFocused = state.toolPanelInputFocused,
-                                isLoading = state.toolPanelLoading,
-                                initialText = state.toolPanelPrefillText,
-                                controls = state.toolPanelUiNodes,
-                                backgroundColor = Color.Transparent,
-                                textColor = keyTextColor,
-                                accentColor = accentColor,
-                                cardBgColor = keyBgColor,
-                                onClose = { callbacks.onToolPanelClose?.invoke() },
-                                onFocusChange = { focused -> callbacks.onToolPanelFocusChange?.invoke(focused) },
-                                onFieldInput = { key, value -> callbacks.onToolPanelFieldInput?.invoke(key, value) },
-                                onPanelAction = { actionId -> callbacks.onToolPanelAction?.invoke(actionId) },
-                            )
-                        }
-                        Box(Modifier.fillMaxWidth().weight(1f)) {
-                            EmojiKeyboardLayout(
-                                onEmojiSelect = { emoji ->
-                                    onHapticFeedback?.invoke()
-                                    if (emoji == "delete") {
-                                        callbacks.onKeyPress("delete", false)
-                                    } else {
-                                        callbacks.onCommitText?.invoke(emoji)
-                                    }
-                                },
-                                onImageEmojiSelect = callbacks.onCommitImage,
-                                onBack = { viewModel.closeOverlay() },
-                                backgroundColor = keyboardBgColor,
-                                textColor = keyTextColor,
-                                accentColor = accentColor,
-                                bottomPaddingDp = state.keyboardBottomPaddingDp,
-                                modifier = Modifier.fillMaxSize(),
-                                onHapticFeedback = onHapticFeedback,
-                            )
-                        }
-                    }
-                    is OverlayRoute.Symbol -> Column(Modifier.fillMaxWidth().fillMaxHeight()) {
-                        // 翻译等 ACTIVE 面板保持显示在符号面板上方（与 Emoji 分支同理）
-                        if (state.toolPanelVisible && state.toolPanelDisplay != "PASSIVE") {
-                            ToolPanel(
-                                title = state.toolPanelTitle,
-                                isFocused = state.toolPanelInputFocused,
-                                isLoading = state.toolPanelLoading,
-                                initialText = state.toolPanelPrefillText,
-                                controls = state.toolPanelUiNodes,
-                                backgroundColor = Color.Transparent,
-                                textColor = keyTextColor,
-                                accentColor = accentColor,
-                                cardBgColor = keyBgColor,
-                                onClose = { callbacks.onToolPanelClose?.invoke() },
-                                onFocusChange = { focused -> callbacks.onToolPanelFocusChange?.invoke(focused) },
-                                onFieldInput = { key, value -> callbacks.onToolPanelFieldInput?.invoke(key, value) },
-                                onPanelAction = { actionId -> callbacks.onToolPanelAction?.invoke(actionId) },
-                            )
-                        }
-                        Box(Modifier.fillMaxWidth().weight(1f)) {
-                            SymbolKeyboardLayout(
-                                onSelect = { symbol ->
-                                    onHapticFeedback?.invoke()
-                                    if (symbol == "delete") {
-                                        callbacks.onKeyPress("delete", false)
-                                    } else {
-                                        callbacks.onCommitText?.invoke(symbol)
-                                    }
-                                },
-                                onBack = { viewModel.closeOverlay() },
-                                backgroundColor = keyboardBgColor,
-                                textColor = keyTextColor,
-                                accentColor = accentColor,
-                                keyBgColor = keyBgColor,
-                                specialKeyBgColor = specialKeyBgColor,
-                                specialKeyTextColor = specialKeyTextColor,
-                                bottomPaddingDp = state.keyboardBottomPaddingDp,
-                                modifier = Modifier.fillMaxSize(),
-                                onHapticFeedback = onHapticFeedback,
-                            )
-                        }
-                    }
+                    // 翻译等 ACTIVE 面板开着时，本覆盖层已在顶部让出"面板+工具栏"高度（见上方 offset），
+                    // Emoji/Symbol 只替换键盘按键区，不再把面板塞进覆盖层。
+                    is OverlayRoute.Emoji -> EmojiKeyboardLayout(
+                        onEmojiSelect = { emoji ->
+                            onHapticFeedback?.invoke()
+                            if (emoji == "delete") {
+                                callbacks.onKeyPress("delete", false)
+                            } else {
+                                callbacks.onCommitText?.invoke(emoji)
+                            }
+                        },
+                        onImageEmojiSelect = callbacks.onCommitImage,
+                        onBack = { viewModel.closeOverlay() },
+                        backgroundColor = keyboardBgColor,
+                        textColor = keyTextColor,
+                        accentColor = accentColor,
+                        bottomPaddingDp = state.keyboardBottomPaddingDp,
+                        modifier = Modifier.fillMaxWidth().fillMaxHeight(),
+                        onHapticFeedback = onHapticFeedback,
+                    )
+                    is OverlayRoute.Symbol -> SymbolKeyboardLayout(
+                        onSelect = { symbol ->
+                            onHapticFeedback?.invoke()
+                            if (symbol == "delete") {
+                                callbacks.onKeyPress("delete", false)
+                            } else {
+                                callbacks.onCommitText?.invoke(symbol)
+                            }
+                        },
+                        onBack = { viewModel.closeOverlay() },
+                        backgroundColor = keyboardBgColor,
+                        textColor = keyTextColor,
+                        accentColor = accentColor,
+                        keyBgColor = keyBgColor,
+                        specialKeyBgColor = specialKeyBgColor,
+                        specialKeyTextColor = specialKeyTextColor,
+                        bottomPaddingDp = state.keyboardBottomPaddingDp,
+                        modifier = Modifier.fillMaxWidth().fillMaxHeight(),
+                        onHapticFeedback = onHapticFeedback,
+                    )
                     is OverlayRoute.SplitWords -> SplitWordsView(
                         text = p.route.text,
                         backgroundColor = keyboardBgColor,

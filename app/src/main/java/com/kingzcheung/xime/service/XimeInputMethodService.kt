@@ -1569,9 +1569,15 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 // 需与 ToolPanel 渲染高度一致（toolPanelHeightDp：内容自适应 + 上限），
                 // 否则容器比面板多/少一截，键盘被拉高。
                 // PASSIVE 纯展示面板走 Overlay 全屏覆盖（键盘窗口内容区），不撑高。
+                // Emoji/Symbol Overlay 只替换按键区、ACTIVE 面板保持原位渲染（见 KeyboardView），
+                // 这两个路由下面板仍参与撑高；其余 Overlay 路由维持整屏覆盖不撑高。
+                val toolPanelKeptOnOverlay = ((page as? com.kingzcheung.xime.keyboard.KeyboardPage.Overlay)?.route).let {
+                    it is com.kingzcheung.xime.keyboard.OverlayRoute.Emoji ||
+                        it is com.kingzcheung.xime.keyboard.OverlayRoute.Symbol
+                }
                 val toolPanelExtra = if (state.toolPanelVisible &&
                     state.toolPanelDisplay != "PASSIVE" &&
-                    !isOverlayPage
+                    (!isOverlayPage || toolPanelKeptOnOverlay)
                 ) {
                     com.kingzcheung.xime.ui.keyboard.toolPanelHeightDp(
                         hasControls = !state.toolPanelUiNodes.isNullOrEmpty(),
