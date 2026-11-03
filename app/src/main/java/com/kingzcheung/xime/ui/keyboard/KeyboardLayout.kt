@@ -173,7 +173,7 @@ fun KeyboardLayout(
     val onKeyPressDown = callbacks.onKeyPressDown
     val onKeyRelease = callbacks.onKeyRelease
     val onVoiceModeChange = callbacks.onVoiceModeChange
-    val onCommitText = callbacks.onCommitText
+    val onCommitText = commitTextForMode(callbacks.onCommitText, isAsciiMode)
     val requestVoice = buildVoiceRequest(context, isSttEnabled, onVoiceModeChange)
     val onGestureAction = buildUiGestureHandler(viewModel, callbacks, uiState, requestVoice, onKeyPress)
     val suppressCursorMove = LocalSuppressCursorMove.current
@@ -520,6 +520,19 @@ internal fun swipeUpHandlerFor(
     if (swipeUp == null && commitValue == null) return null
     // 参数为按键组件回传的上滑提示文本（本处理器用不到，忽略）
     return { _: String -> dispatchKeyActionOrPress(swipeUp, commitValue, onKeyPress, onCommitText, onGestureAction) }
+}
+
+/**
+ * 按键 COMMIT 上屏入口：英文态（ASCII）下全角括号按半角输出。
+ * 自定义布局的数字行（1-0）上滑常沿用中文全角标点（9→（，0→）），
+ * 这类动作绕过 Rime 直接上屏，只能在此归一化；中文态保持原样。
+ */
+internal fun commitTextForMode(
+    commit: ((String) -> Unit)?,
+    isAsciiMode: Boolean,
+): ((String) -> Unit)? {
+    if (commit == null || !isAsciiMode) return commit
+    return { text -> commit(text.replace('（', '(').replace('）', ')')) }
 }
 
 /**
@@ -2060,7 +2073,7 @@ private fun LandscapeKeyboardContent(
     val enterKeyText = uiState.enterKeyText
     val onKeyPressDown = callbacks.onKeyPressDown
     val onKeyRelease = callbacks.onKeyRelease
-    val onCommitText = callbacks.onCommitText
+    val onCommitText = commitTextForMode(callbacks.onCommitText, isAsciiMode)
     // 分体路径与主键盘同源语音入口（空格长按/语音键）：此前 requestVoice=null 透传服务层，
     // 而 KeyActionContext 未挂 ui，voice 动作静默失效
     val requestVoice = buildVoiceRequest(LocalContext.current, uiState.isSttEnabled, callbacks.onVoiceModeChange)
