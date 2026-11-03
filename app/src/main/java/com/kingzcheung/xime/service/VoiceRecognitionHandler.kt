@@ -51,14 +51,6 @@ class VoiceRecognitionHandler(
         private val SPACE_BEFORE_PUNCT_REGEX = Regex("\\s+([,.!?;:，。！？；：、])")
         private val ASCII_PUNCT_FOLLOWED_LATIN_REGEX = Regex("([,;:!?])(?=[A-Za-z])")
         private val PERIOD_FOLLOWED_UPPER_REGEX = Regex("(?<=[a-z])\\.(?=[A-Z])")
-        private val CJK_CHAR_REGEX = Regex("[$CJK_CHAR]")
-
-        private val LATIN_QUESTION_STARTERS = setOf(
-            "what", "why", "how", "who", "whom", "whose", "where", "when", "which",
-            "do", "does", "did", "is", "are", "was", "were", "am",
-            "can", "could", "will", "would", "shall", "should", "may", "might",
-            "have", "has", "had"
-        )
     }
 
     private lateinit var speechRecognitionManager: SpeechRecognitionManager
@@ -469,46 +461,14 @@ class VoiceRecognitionHandler(
         return result
     }
 
+    /**
+     * 语音结果收尾：只做文本规整，不再自动补句末标点；
+     * 并去掉引擎自动追加的中文句号（用户不需要语音输入自带句号）。
+     */
     private fun addPunctuation(text: String): String {
         val cleanText = normalizeAsrText(text)
-        if (cleanText.isEmpty()) return text
-
-        val last = cleanText.last()
-        if (CJK_CHAR_REGEX.containsMatchIn(cleanText)) {
-            // 中文/日文：沿用中文句读；末尾已有标点则不再追加，避免"。。"
-            if (last in "。！？；：，、,.!?;:") return cleanText
-            return "$cleanText${heuristicPunctuation(cleanText)}"
-        }
-
-        // 英文：模型若给出中文句末标点则转成半角；已有标点不重复追加
-        if (last in "。！？，；：") {
-            return cleanText.dropLast(1) + when (last) {
-                '。' -> "."
-                '！' -> "!"
-                '？' -> "?"
-                '，' -> ","
-                '；' -> ";"
-                else -> ":"
-            }
-        }
-        if (last in ",.!?;:") return cleanText
-        return cleanText + heuristicLatinPunctuation(cleanText)
-    }
-
-    private fun heuristicPunctuation(text: String): String {
-        return when {
-            text.any { it in "吗呢么吧" } || text.contains("什么") || text.contains("怎么") || text.contains("为什么") || text.contains("如何") || text.contains("哪") -> "？"
-            text.length < 4 -> "，"
-            else -> "。"
-        }
-    }
-
-    private fun heuristicLatinPunctuation(text: String): String {
-        val firstWord = text.trimStart()
-            .substringBefore(' ')
-            .trim('"', '\'', '(', '[')
-            .lowercase()
-        return if (firstWord in LATIN_QUESTION_STARTERS) "?" else "."
+        if (cleanText.isEmpty()) return cleanText
+        return if (cleanText.endsWith("。")) cleanText.dropLast(1) else cleanText
     }
 
     private fun handlePartialResult(text: String) {

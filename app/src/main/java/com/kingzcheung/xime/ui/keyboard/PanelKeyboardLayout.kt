@@ -6,8 +6,11 @@ import com.kingzcheung.xime.i18n.tr
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -15,10 +18,18 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -36,11 +47,13 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -50,6 +63,7 @@ import androidx.compose.ui.unit.sp
 import com.kingzcheung.xime.keyboard.GestureAction
 import com.kingzcheung.xime.settings.KeysConfigHelper
 import com.kingzcheung.xime.settings.PanelLayoutConfig
+import com.kingzcheung.xime.settings.SettingsPreferences
 import com.kingzcheung.xime.ui.isTablet
 import com.kingzcheung.xime.viewmodel.KeyboardUiState
 import com.kingzcheung.xime.viewmodel.KeyboardViewModel
@@ -101,6 +115,11 @@ fun PanelKeyboardLayout(
     val suppressCursorMove = LocalSuppressCursorMove.current
     val swipeBubble = rememberSwipeBubbleController()
     var keyboardBounds by remember { mutableStateOf(Rect(0f, 0f, 0f, 0f)) }
+    val context = LocalContext.current
+    // 数字键盘运算符栏：自定义符号（持久化）+ 自由编辑态 + 原符号面板选择态
+    var operatorSymbols by remember { mutableStateOf(SettingsPreferences.getNumberOperatorSymbols(context)) }
+    var editingOperators by remember { mutableStateOf(false) }
+    var showSymbolPicker by remember { mutableStateOf(false) }
 
     fun processSwipeState(state: SwipeState, bounds: Rect) {
         swipeBubble.update(
@@ -188,6 +207,18 @@ fun PanelKeyboardLayout(
                 layout.columns -> ColumnsPanelContent(
                     layout = mirrorColumnsForEntryPosition(layout, backKeyOnLeft),
                     env = env,
+                    operatorSymbols = operatorSymbols,
+                    editingOperators = editingOperators,
+                    onOperatorDelete = { symbol ->
+                        // 至少保留一个符号，避免运算符栏被删空
+                        val updated = operatorSymbols - symbol
+                        if (updated.isNotEmpty()) {
+                            operatorSymbols = updated
+                            SettingsPreferences.setNumberOperatorSymbols(context, updated)
+                        }
+                    },
+                    onOperatorAdd = { showSymbolPicker = true },
+                    onOperatorEditToggle = { editingOperators = !editingOperators },
                     // 外围留白与九键拼音键盘（T9KeyboardLayout）对齐：竖屏 4dp 两侧 + 8dp 底部
                     // （平板 16dp，与主键盘/符号面板一致），横屏 2dp 上下 + 50dp 左右。
                     modifier = Modifier
@@ -205,6 +236,26 @@ fun PanelKeyboardLayout(
                         PanelRow(row, env, Modifier.fillMaxWidth().weight(1f))
                     }
                 }
+            }
+            // 自由编辑新增符号：复用键盘原有的全量符号面板（样式/分类/图标完全一致）
+            if (section == "number" && showSymbolPicker) {
+                SymbolKeyboardLayout(
+                    onSelect = { symbol ->
+                        if (symbol.isNotBlank() && symbol != "delete" && symbol !in operatorSymbols) {
+                            val updated = operatorSymbols + symbol
+                            operatorSymbols = updated
+                            SettingsPreferences.setNumberOperatorSymbols(context, updated)
+                        }
+                    },
+                    onBack = { showSymbolPicker = false },
+                    backgroundColor = keyboardBackgroundColor,
+                    textColor = keyTextColor,
+                    accentColor = specialKeyTextColor,
+                    keyBgColor = keyBackgroundColor,
+                    specialKeyBgColor = specialKeyBackgroundColor,
+                    specialKeyTextColor = specialKeyTextColor,
+                    modifier = Modifier.fillMaxSize(),
+                )
             }
         }
     }
@@ -356,7 +407,16 @@ private fun RowsPanelSplitContent(rows: List<List<String>>, env: QwertyRowEnv, m
  * 中列 = 数字区（weight 3.4f）；右列 = 功能列（weight 0.8f）。列间 2dp 间距。
  */
 @Composable
-private fun ColumnsPanelContent(layout: PanelLayoutConfig, env: QwertyRowEnv, modifier: Modifier = Modifier) {
+private fun ColumnsPanelContent(
+    layout: PanelLayoutConfig,
+    env: QwertyRowEnv,
+    operatorSymbols: List<String>,
+    editingOperators: Boolean,
+    onOperatorDelete: (String) -> Unit,
+    onOperatorAdd: () -> Unit,
+    onOperatorEditToggle: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(2.dp),
@@ -367,35 +427,21 @@ private fun ColumnsPanelContent(layout: PanelLayoutConfig, env: QwertyRowEnv, mo
                 .fillMaxHeight(),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            val pillarItems = layout.left.dropLast(1)
             val bottomKey = layout.left.lastOrNull()?.singleOrNull()
-            Column(
+            OperatorPillar(
+                symbols = operatorSymbols,
+                editing = editingOperators,
+                onTap = { env.onKeyPress(it) },
+                onPress = { env.onKeyPressDown?.invoke(it) },
+                onDelete = onOperatorDelete,
+                onAdd = onOperatorAdd,
+                onToggleEdit = onOperatorEditToggle,
+                env = env,
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(3f)
                     .padding(LocalKeyVisualPadding.current),
-            ) {
-                pillarItems.forEachIndexed { itemIdx, item ->
-                    Column(modifier = Modifier.fillMaxWidth().weight(1f)) {
-                        item.forEachIndexed { keyIdx, keyId ->
-                            OperatorPillarKey(
-                                text = keyId,
-                                onClick = { env.onKeyPress(keyId) },
-                                backgroundColor = env.keyBackgroundColor,
-                                textColor = env.keyTextColor,
-                                modifier = Modifier.weight(1f),
-                                onPress = { env.onKeyPressDown?.invoke(keyId) },
-                                isFirst = itemIdx == 0 && keyIdx == 0,
-                                isLast = itemIdx == pillarItems.lastIndex && keyIdx == item.lastIndex,
-                                fontSize = 18.sp,
-                                shadowEnabled = env.shadowEnabled,
-                                shadowElevation = env.shadowElevation,
-                                shadowShapeRadius = env.shadowShapeRadius,
-                            )
-                        }
-                    }
-                }
-            }
+            )
             Row(modifier = Modifier.fillMaxWidth().weight(1f)) {
                 if (bottomKey != null) PanelKeyCell(bottomKey, env, Modifier.weight(1f))
             }
@@ -410,7 +456,11 @@ private fun ColumnsPanelContent(layout: PanelLayoutConfig, env: QwertyRowEnv, mo
         Column(modifier = Modifier.weight(0.8f).fillMaxHeight()) {
             layout.right.forEach { item ->
                 val id = item.firstOrNull()
-                if (id != null) PanelKeyCell(id, env, Modifier.weight(1f))
+                if (id != null) {
+                    // enter 拉高占两格（原表情键 + 确定键的高度），仍与原四行高度对齐
+                    val weight = if (id == "enter") 2f else 1f
+                    PanelKeyCell(id, env, Modifier.weight(weight))
+                }
             }
         }
     }
@@ -485,6 +535,124 @@ internal fun PanelBackCell(env: QwertyRowEnv, modifier: Modifier = Modifier, id:
 }
 
 /**
+ * 数字键盘左列运算符栏：可视区固定为原来的四格高度（布局不变），
+ * 上下滑动可查看 `=` 及自由编辑新增的符号；列表末尾常驻“自由编辑”入口。
+ */
+@Composable
+private fun OperatorPillar(
+    symbols: List<String>,
+    editing: Boolean,
+    onTap: (String) -> Unit,
+    onPress: (String) -> Unit,
+    onDelete: (String) -> Unit,
+    onAdd: () -> Unit,
+    onToggleEdit: () -> Unit,
+    env: QwertyRowEnv,
+    modifier: Modifier = Modifier,
+) {
+    val scrollState = rememberScrollState()
+    BoxWithConstraints(modifier = modifier) {
+        // 可视区高度 = 原四键键柱高度，每键等高，保证默认只显示 + - * /
+        val keyHeight = maxHeight / 4f
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(scrollState),
+        ) {
+            symbols.forEachIndexed { index, symbol ->
+                Box(modifier = Modifier.fillMaxWidth().height(keyHeight)) {
+                    OperatorPillarKey(
+                        text = symbol,
+                        onClick = { if (!editing) onTap(symbol) },
+                        backgroundColor = env.keyBackgroundColor,
+                        textColor = env.keyTextColor,
+                        modifier = Modifier.fillMaxSize(),
+                        onPress = if (editing) null else { { onPress(symbol) } },
+                        isFirst = index == 0,
+                        isLast = false,
+                        fontSize = 18.sp,
+                        shadowEnabled = env.shadowEnabled,
+                        shadowElevation = env.shadowElevation,
+                        shadowShapeRadius = env.shadowShapeRadius,
+                    )
+                    if (editing) {
+                        OperatorDeleteBadge(
+                            env = env,
+                            onDelete = { onDelete(symbol) },
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(2.dp),
+                        )
+                    }
+                }
+            }
+            if (editing) {
+                Box(modifier = Modifier.fillMaxWidth().height(keyHeight)) {
+                    OperatorPillarKey(
+                        text = "",
+                        onClick = onAdd,
+                        backgroundColor = env.keyBackgroundColor,
+                        textColor = env.keyTextColor,
+                        modifier = Modifier.fillMaxSize(),
+                        isFirst = false,
+                        isLast = false,
+                        fontSize = 18.sp,
+                        shadowEnabled = env.shadowEnabled,
+                        shadowElevation = env.shadowElevation,
+                        shadowShapeRadius = env.shadowShapeRadius,
+                        icon = Icons.Filled.Add,
+                        iconContentDescription = "添加符号",
+                    )
+                }
+            }
+            Box(modifier = Modifier.fillMaxWidth().height(keyHeight)) {
+                OperatorPillarKey(
+                    text = "",
+                    onClick = onToggleEdit,
+                    backgroundColor = env.keyBackgroundColor,
+                    textColor = env.keyTextColor,
+                    modifier = Modifier.fillMaxSize(),
+                    isFirst = symbols.isEmpty() && !editing,
+                    isLast = true,
+                    fontSize = 18.sp,
+                    shadowEnabled = env.shadowEnabled,
+                    shadowElevation = env.shadowElevation,
+                    shadowShapeRadius = env.shadowShapeRadius,
+                    icon = if (editing) Icons.Filled.Check else Icons.Filled.Edit,
+                    iconContentDescription = if (editing) "完成编辑" else "自由编辑",
+                )
+            }
+        }
+    }
+}
+
+/** 编辑态删除角标：复用原键盘功能键配色，点角标删除对应符号。 */
+@Composable
+private fun OperatorDeleteBadge(
+    env: QwertyRowEnv,
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .size(18.dp)
+            .clip(CircleShape)
+            .background(env.specialKeyBackgroundColor)
+            .pointerInput(Unit) {
+                detectTapGestures(onTap = { onDelete() })
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Close,
+            contentDescription = "删除符号",
+            tint = env.specialKeyTextColor,
+            modifier = Modifier.size(10.dp),
+        )
+    }
+}
+
+/**
  * 运算符键柱单键（数字键盘左列）：首键上圆角、末键下圆角、其余方角，
  * 柱内键无间隙，视觉上连成一柱（复刻旧 NumberSymbolKey）。
  */
@@ -502,6 +670,8 @@ private fun OperatorPillarKey(
     shadowEnabled: Boolean = true,
     shadowElevation: Dp = 1.dp,
     shadowShapeRadius: Dp = 8.dp,
+    icon: ImageVector? = null,
+    iconContentDescription: String? = null,
 ) {
     var isPressed by remember { mutableStateOf(false) }
     val currentOnClick by rememberUpdatedState(onClick)
@@ -548,13 +718,22 @@ private fun OperatorPillarKey(
             },
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = text,
-            color = textColor,
-            fontSize = fontSize,
-            fontWeight = FontWeight.Normal,
-            modifier = Modifier.padding(vertical = 2.dp),
-            fontFamily = AppFonts.keyFontFamily,
-        )
+        if (icon != null) {
+            Icon(
+                imageVector = icon,
+                contentDescription = iconContentDescription,
+                tint = textColor,
+                modifier = Modifier.size(20.dp),
+            )
+        } else {
+            Text(
+                text = text,
+                color = textColor,
+                fontSize = fontSize,
+                fontWeight = FontWeight.Normal,
+                modifier = Modifier.padding(vertical = 2.dp),
+                fontFamily = AppFonts.keyFontFamily,
+            )
+        }
     }
 }

@@ -558,8 +558,8 @@ keyboard:
       g: { tap: "g", swipe_up: { label: "“", value: "“" }, swipe_down: { label: "王龶五一戋", action: "none", display: "bubble" }, long_press: { display: "bubble", values: [{ action: commit, value: "g" }, { action: commit, value: "G" }] } }
       h: { tap: "h", swipe_up: { label: "”", value: "”" }, swipe_down: { label: "目丨卜⺊上止龰", action: "none", display: "bubble" }, long_press: { display: "bubble", values: [{ action: commit, value: "h" }, { action: commit, value: "H" }] } }
       j: { tap: "j", swipe_up: { label: "－", value: "-" }, swipe_down: { label: "日曰早廾刂虫丿Ⅱ", action: "none", display: "bubble" }, long_press: { display: "bubble", values: [{ action: commit, value: "j" }, { action: commit, value: "J" }] } }
-      k: { tap: "k", swipe_up: { label: "（", action: commit, value: "(" }, swipe_down: { label: "口Ⅲ川", action: "none", display: "bubble" }, long_press: { display: "bubble", values: [{ action: commit, value: "k" }, { action: commit, value: "K" }] } }
-      l: { tap: "l", swipe_up: { label: "）", action: commit, value: ")" }, swipe_down: { label: "田甲囗四罒车皿力", action: "none", display: "bubble" }, long_press: { display: "bubble", values: [{ action: commit, value: "l" }, { action: commit, value: "L" }] } }
+      k: { tap: "k", swipe_up: { label: "(", action: commit, value: "(" }, swipe_down: { label: "口Ⅲ川", action: "none", display: "bubble" }, long_press: { display: "bubble", values: [{ action: commit, value: "k" }, { action: commit, value: "K" }] } }
+      l: { tap: "l", swipe_up: { label: ")", action: commit, value: ")" }, swipe_down: { label: "田甲囗四罒车皿力", action: "none", display: "bubble" }, long_press: { display: "bubble", values: [{ action: commit, value: "l" }, { action: commit, value: "L" }] } }
       # ── 第三行 ──
       z: { tap: "z", swipe_up: { label: "*", action: commit, value: "*" }, swipe_down: { label: "", action: "none", display: "key", bubble: false }, long_press: { display: "bubble", values: [{ action: commit, value: "z" }, { action: commit, value: "Z" }] } }
       x: { tap: "x", swipe_up: { label: "＠", value: "@" }, swipe_down: { label: "弓匕纟幺弓𠤎", action: "none", display: "bubble" }, long_press: { display: "bubble", values: [{ action: commit, value: "x" }, { action: commit, value: "X" }] } }
@@ -1020,8 +1020,8 @@ keyboard:
         - [1, 2, 3]
         - [4, 5, 6]
         - [7, 8, 9]
-        - [open_symbols, 0, "."]
-      right: [delete, space_bar, emoji, enter]
+        - [space_bar, 0, "."]
+      right: [delete, open_symbols, enter]
     keys:
       enter: { tap: { action: send_rime, value: enter, label: "确定" } }
 

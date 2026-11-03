@@ -24,6 +24,9 @@ object SettingsPreferences {
     private const val KEY_PLUGIN_DEV_MODE = "plugin_dev_mode"
     /** 按键坐标日志开关（相邻键纠错数据采集，默认关闭）。 */
     private const val KEY_KEY_TAP_LOG = "key_tap_log"
+    /** 数字键盘左侧运算符栏的自定义符号（单元分隔符连接，保持顺序）。 */
+    private const val KEY_NUMBER_OPERATOR_SYMBOLS = "number_operator_symbols"
+    private const val NUMBER_OPERATOR_SYMBOL_SEPARATOR = "\u001F"
     /** 纠错模型影子模式（只记录"会怎么改"，不改行为，默认关闭）。 */
 
     private const val KEY_CORRECTOR_ENABLED = "corrector_enabled"
@@ -148,6 +151,21 @@ object SettingsPreferences {
 
     fun setInputTextLocation(context: Context, location: String) {
         getPrefs(context).edit().putString(KEY_INPUT_TEXT_LOCATION, location).apply()
+    }
+
+    /** 数字键盘运算符栏默认符号：前四个即原有可见布局，`=` 等需滑动查看。 */
+    val DEFAULT_NUMBER_OPERATOR_SYMBOLS = listOf("+", "-", "*", "/", "=")
+
+    fun getNumberOperatorSymbols(context: Context): List<String> {
+        val raw = getPrefs(context).getString(KEY_NUMBER_OPERATOR_SYMBOLS, null)
+            ?: return DEFAULT_NUMBER_OPERATOR_SYMBOLS
+        val symbols = raw.split(NUMBER_OPERATOR_SYMBOL_SEPARATOR).filter { it.isNotBlank() }
+        return symbols.ifEmpty { DEFAULT_NUMBER_OPERATOR_SYMBOLS }
+    }
+
+    fun setNumberOperatorSymbols(context: Context, symbols: List<String>) {
+        val value = symbols.distinct().joinToString(NUMBER_OPERATOR_SYMBOL_SEPARATOR)
+        getPrefs(context).edit().putString(KEY_NUMBER_OPERATOR_SYMBOLS, value).apply()
     }
 
     private fun getPrefs(context: Context): SharedPreferences {
