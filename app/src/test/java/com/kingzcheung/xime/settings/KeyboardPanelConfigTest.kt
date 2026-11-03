@@ -59,11 +59,12 @@ class KeyboardPanelConfigTest {
                 listOf("1", "2", "3"),
                 listOf("4", "5", "6"),
                 listOf("7", "8", "9"),
-                listOf("open_symbols", "0", "."),
+                listOf("space_bar", "0", "."),
             ),
             layout.rows,
         )
-        assertEquals(listOf(listOf("delete"), listOf("space_bar"), listOf("emoji"), listOf("enter")), layout.right)
+        // 全符号与空格互换；表情键移除，确定键在渲染时占两格高
+        assertEquals(listOf(listOf("delete"), listOf("open_symbols"), listOf("enter")), layout.right)
     }
 
     @Test

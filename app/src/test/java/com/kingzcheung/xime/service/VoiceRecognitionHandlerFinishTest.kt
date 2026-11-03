@@ -120,11 +120,11 @@ class VoiceRecognitionHandlerFinishTest {
         assertEquals(RecognitionState.PROCESSING, stateChanges.last().voiceRecognitionState)
         assertEquals(1, posted.size)
 
-        // 引擎吐出最终结果：提交增量部分（partial 已通过 composing 上屏，句号由启发式补齐）
+        // 引擎吐出最终结果：只提交增量部分（partial 已通过 composing 上屏，不再自动补句号）
         onResult.invoke("你好世界再见")
 
         verify(mockInputConnection).finishComposingText()
-        verify(mockInputConnection).commitText(eq("世界再见。"), eq(1))
+        verify(mockInputConnection).commitText(eq("世界再见"), eq(1))
         assertEquals(1, voiceCompleteCount)
         // 超时兜底已被取消，手动推进不再重复提交
         assertTrue(posted.isEmpty())
@@ -139,14 +139,14 @@ class VoiceRecognitionHandlerFinishTest {
         handler.finishRecognition()
         runTimeouts()
 
-        // 部分结果"你好"已通过 composing 上屏，兜底只补上启发式句号"，"
+        // 部分结果"你好"已通过 composing 上屏，兜底不再自动补标点，无增量可提交
         verify(mockInputConnection).finishComposingText()
-        verify(mockInputConnection).commitText(eq("，"), eq(1))
+        verify(mockInputConnection, never()).commitText(any(), anyInt())
         assertEquals(1, voiceCompleteCount)
 
         // 迟到的最终结果被抑制：不再写入输入框（避免重复/错乱）
         onResult.invoke("你好世界再见")
-        verify(mockInputConnection, times(1)).commitText(any(), anyInt())
+        verify(mockInputConnection, never()).commitText(any(), anyInt())
         assertEquals(2, voiceCompleteCount)
     }
 
@@ -217,21 +217,21 @@ class VoiceRecognitionHandlerFinishTest {
     }
 
     @Test
-    fun `英文最终结果保留空格并使用半角句号`() {
+    fun `英文最终结果保留空格且不再自动补半角句号`() {
         onPartial.invoke("I am fine")
         onResult.invoke("I am fine")
 
         verify(mockInputConnection).finishComposingText()
-        // composing 已经是 "I am fine"，最终只补 "."
-        verify(mockInputConnection).commitText(eq("."), eq(1))
+        // composing 已经是 "I am fine"，不再自动补 "."，也没有增量可提交
+        verify(mockInputConnection, never()).commitText(any(), anyInt())
     }
 
     @Test
-    fun `英文疑问句补半角问号`() {
+    fun `英文疑问句不再自动补半角问号`() {
         onPartial.invoke("How are you")
         onResult.invoke("How are you")
 
-        verify(mockInputConnection).commitText(eq("?"), eq(1))
+        verify(mockInputConnection, never()).commitText(any(), anyInt())
     }
 
     @Test
@@ -250,10 +250,10 @@ class VoiceRecognitionHandlerFinishTest {
         // 用户尚未松手，流式插件按句回调 final：该句上屏，会话必须继续
         onResult.invoke("你好")
 
-        // 提交了增量（composing 收尾 + 补句读），但不结束会话、不停止录音——
+        // 只做 composing 收尾（不再自动补句读），但不结束会话、不停止录音——
         // 若此时触发 onVoiceComplete，松手停止链即失效，录音会一直在后台运行
         verify(mockInputConnection).finishComposingText()
-        verify(mockInputConnection).commitText(eq("，"), eq(1))
+        verify(mockInputConnection, never()).commitText(any(), anyInt())
         verify(mockManager, never()).stopRecognition()
         assertEquals(0, voiceCompleteCount)
 
@@ -287,16 +287,16 @@ class VoiceRecognitionHandlerFinishTest {
         onPartial.invoke("你好")
         handler.sealPendingForSend()
 
-        // 立即冲刷 composing：收尾 + 补齐启发式句读（与松手兜底同一条路径）
+        // 立即冲刷 composing：收尾后没有新增标点（与松手兜底同一条路径）
         verify(mockInputConnection).finishComposingText()
-        verify(mockInputConnection).commitText(eq("，"), eq(1))
+        verify(mockInputConnection, never()).commitText(any(), anyInt())
         // 封口自身不结束会话/不停止录音：收尾交给调用方的 endVoiceSession
         verify(mockManager, never()).stopRecognition()
         assertEquals(0, voiceCompleteCount)
 
         // 引擎随后才吐出的最终结果被丢弃，不再写入输入框
         onResult.invoke("你好世界再见")
-        verify(mockInputConnection, times(1)).commitText(any(), anyInt())
+        verify(mockInputConnection, never()).commitText(any(), anyInt())
         assertEquals(1, voiceCompleteCount)
     }
 
@@ -308,15 +308,15 @@ class VoiceRecognitionHandlerFinishTest {
 
         handler.sealPendingForSend()
 
-        // 超时兜底被取消，已识别文本立即落盘（不等引擎最终结果）
+        // 超时兜底被取消，已识别文本已在 composing 中（不再自动补标点）
         assertTrue(posted.isEmpty())
         verify(mockInputConnection).finishComposingText()
-        verify(mockInputConnection).commitText(eq("，"), eq(1))
+        verify(mockInputConnection, never()).commitText(any(), anyInt())
         assertEquals(0, voiceCompleteCount)
 
         runTimeouts()
         onResult.invoke("你好世界再见")
-        verify(mockInputConnection, times(1)).commitText(any(), anyInt())
+        verify(mockInputConnection, never()).commitText(any(), anyInt())
         assertEquals(1, voiceCompleteCount)
     }
 
@@ -412,7 +412,7 @@ class VoiceRecognitionHandlerFinishTest {
         // 不再走"删除已上屏部分 + 整段重写"，已发送内容不会被写回
         verify(mockInputConnection, never()).deleteSurroundingText(anyInt(), anyInt())
         verify(mockInputConnection, never()).commitText(eq("一个人，两个人。"), anyInt())
-        assertEquals("两个人。", fakeBoxText)
+        assertEquals("两个人", fakeBoxText)
     }
 
     @Test
