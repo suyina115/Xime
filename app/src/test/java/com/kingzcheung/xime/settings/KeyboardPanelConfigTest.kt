@@ -145,7 +145,7 @@ class KeyboardPanelConfigTest {
         // 数字面板回车走引擎（与主键盘同语义），不是直接上屏
         assertEquals(GestureAction.SEND_RIME, number!!["enter"]?.tap?.action)
         assertEquals("enter", number["enter"]?.tap?.value)
-        assertEquals("确定", number["enter"]?.tap?.label)
+        assertEquals("回车", number["enter"]?.tap?.label)
     }
 
     @Test
