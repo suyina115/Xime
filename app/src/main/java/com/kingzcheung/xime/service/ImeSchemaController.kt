@@ -179,6 +179,10 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
                 editSelActive = editSelAnchor
             }
             "select_end" -> {
+                // 取消选择：把宿主选区折叠到活动端（选中态随之消失），再清锚点
+                if (editSelActive >= 0) {
+                    ic.setSelection(editSelActive, editSelActive)
+                }
                 editSelAnchor = -1
                 editSelActive = -1
             }

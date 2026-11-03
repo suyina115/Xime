@@ -175,6 +175,9 @@ object ToolPanelEditTextHolder {
 
     /** 宿主程序化写入输入框期间的抑制标志：写入不标记 userEdited。 */
     var applyingProgrammatically: Boolean = false
+
+    /** 主输入框最新文本快照：Overlay（符号/表情）切换导致 EditText 销毁重建时恢复内容，翻译文本不被清空。 */
+    var lastText: String? = null
 }
 
 /**
@@ -2480,6 +2483,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 )
             ) {
                 return
+            }
+            // 翻译面板开着时，用户点击/移动宿主光标 → 面板输入焦点让给宿主（点哪输哪）；
+            // 再点面板输入框时由面板自身的 focus 回调恢复（ToolPanel.handlePanelFieldFocus）
+            if (uiState.value.toolPanelInputFocused) {
+                uiState.value = uiState.value.copy(toolPanelInputFocused = false)
             }
             if (!shouldBreakCompositionOnSelectionChange(
                     oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd

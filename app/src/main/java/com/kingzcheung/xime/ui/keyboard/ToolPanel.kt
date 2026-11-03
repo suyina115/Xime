@@ -216,6 +216,7 @@ private fun ToolPanelMainInput(
                         if (!ToolPanelEditTextHolder.applyingProgrammatically) {
                             ToolPanelEditTextHolder.userEdited = true
                         }
+                        ToolPanelEditTextHolder.lastText = text?.toString()
                         hasText = !text.isNullOrEmpty()
                     }
                     onFocusChangeListener = View.OnFocusChangeListener { v, hasFocus ->
@@ -224,6 +225,15 @@ private fun ToolPanelMainInput(
                     setOnClickListener { if (!isFocused) requestFocus() }
                     ToolPanelEditTextHolder.main = this
                     editTextRef = this
+                    // EditText 重建（符号/表情 Overlay 切换）时恢复快照文本，翻译内容不被清空
+                    ToolPanelEditTextHolder.lastText?.let { snap ->
+                        if (snap.isNotEmpty() && text.toString() != snap) {
+                            ToolPanelEditTextHolder.applyingProgrammatically = true
+                            setText(snap)
+                            setSelection(snap.length)
+                            ToolPanelEditTextHolder.applyingProgrammatically = false
+                        }
+                    }
                     if (isFocused) {
                         post { requestFocus() }
                     }
@@ -244,6 +254,11 @@ private fun ToolPanelMainInput(
                 hasText = !editText.text.isNullOrEmpty()
             },
             modifier = Modifier.fillMaxSize(),
+            onRelease = { et ->
+                // Overlay 切换销毁旧 EditText 时断开 holder 引用，防止输入路由写入不可见对象
+                if (ToolPanelEditTextHolder.main === et) ToolPanelEditTextHolder.main = null
+                if (ToolPanelEditTextHolder.editText === et) ToolPanelEditTextHolder.editText = null
+            },
         )
         // 一键清空：仅在输入框有内容时显示；点击清空后 doAfterTextChanged 会把 userEdited 置位，
         // 宿主不再回填剪贴板 prefill，generate 时读到空串（插件提示"请先输入待翻译内容"）。
