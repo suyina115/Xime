@@ -588,7 +588,13 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                         // Rime processKey 只接受标准键码，全角键码（如 U+FF0F）无法识别会被静默
                         // 丢弃，导致中文模式下符号面板点击全角字符无输出（与 rime 生态既有行为一致）。
                         if (char.isNotEmpty() && char.any { it.code > 0x7E }) {
-                            committedText = char
+                            // 英文态（ASCII）：全角括号按半角上屏。部分主题的数字行（1-0）上滑
+                            // 仍配置中文全角标点（9→"，0→"），英文键盘下应按半角输出。
+                            committedText = if (state.isAsciiMode) {
+                                char.replace('（', '(').replace('）', ')')
+                            } else {
+                                char
+                            }
                             needsUIUpdate = true
                         } else if (char == "(" || char == ")") {
                             // 英文键盘上滑括号：直接上屏，绕过 Rime 标点转换（避免中文态被转全角）
